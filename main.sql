@@ -154,6 +154,12 @@ BEGIN
         END
 END
 
+-- 1.1 THỰC THI 
+INSERT INTO SV_MH VALUES ('21520005','IE103','05/09/2022','05/09/2022',8.4) -- THẤT BẠI
+INSERT INTO SV_MH VALUES ('21520005','IE103','05/09/2022','31/12/2023',8.4) -- THÀNH CÔNG
+-- 1.2 KHÔI PHỤC DỮ LIỆU
+DELETE FROM SV_MH WHERE MSSV = '21520005' AND MSMH = 'IE103'
+
 -- 2. DTB không được nhỏ hơn 0 hoặc lớn hơn 10
 CREATE TRIGGER CHECK_DTB
 ON SV_MH
@@ -166,6 +172,12 @@ BEGIN
             ROLLBACK TRANSACTION
         END
 END
+
+-- 2.1 THỰC THI
+INSERT INTO SV_MH VALUES ('21520005','IE103','05/09/2022','31/12/2023',11) -- THẤT BẠI
+INSERT INTO SV_MH VALUES ('21520005','IE103','05/09/2022','31/12/2023',8.4) -- THÀNH CÔNG
+-- 2.2 KHÔI PHỤC DỮ LIỆU
+DELETE FROM SV_MH WHERE MSSV = '21520005' AND MSMH = 'IE103'
 
 -- 3. GIAOVIEN chỉ được dạy những môn do KHOA mà GIAOVIEN đó thuộc về quản lý 
 CREATE TRIGGER GV_KHOA
@@ -216,6 +228,18 @@ BEGIN
         END
 END
 
+-- 3.1 THỰC THI
+-- a. SỬA TRÊN BẢNG GIAOVIEN
+UPDATE GIAOVIEN SET KHOA = 'KH06' WHERE MSGV = 'GV01' -- THẤT BẠI
+-- b. SỬA TRÊN BẢNG MONHOC
+UPDATE MONHOC SET KHOA = 'KH03' WHERE MSMH = 'IE101' -- THẤT BẠI
+-- c. THÊM VÀO BẢNG GV_MH
+INSERT INTO GV_MH VALUES ('GV04','IE101') -- THẤT BẠI
+INSERT INTO GV_MH VALUES ('GV06','IE103') -- THÀNH CÔNG
+
+-- 3.2 KHÔI PHỤC DỮ LIỆU
+DELETE FROM GV_MH WHERE MSGV = 'GV06' AND MSMH = 'IE103'
+
 -- STORED PROCEDURE
 -- 1. In danh sách các sinh viên của 1 khoa
 CREATE PROC in_dssv(@KHOA CHAR(4))
@@ -226,8 +250,10 @@ BEGIN
 	WHERE KHOA = @KHOA
 END
 
+-- 1.1 THỰC THI 
 DECLARE @KHOA CHAR(4)
 EXEC in_dssv @KHOA = 'KH02'
+
 -- 2. Nhập vào 2 sinh viên, 1 môn học, tìm xem sinh viên nào có điểm trung bình cao hơn và in ra thông tin, nếu bằng nhau thì in ra thông báo 
 CREATE PROC sosanh_diem(@MSSV1 CHAR(8),@MSSV2 CHAR(8),@MSMH CHAR(5))
 AS
@@ -239,10 +265,11 @@ BEGIN
 		ELSE
 			PRINT (N'2 sinh viên trên có điểm trung bình bằng nhau')
 END
-DROP PROC sosanh_diem
+
+-- 2.1 THỰC THI 
 DECLARE @MSSV1 CHAR(8), @MSSV2 CHAR(8), @MSMH CHAR(5)
-EXEC sosanh_diem @MSSV1 = '21520001', @MSSV2 = '21520002', @MSMH = 'IE103'
-EXEC sosanh_diem @MSSV1 = '21520001', @MSSV2 = '21520002', @MSMH = 'IT007'
+EXEC sosanh_diem @MSSV1 = '21520001', @MSSV2 = '21520002', @MSMH = 'IE103' -- BẰNG NHAU
+EXEC sosanh_diem @MSSV1 = '21520001', @MSSV2 = '21520002', @MSMH = 'IT007' -- SV1 CAO ĐIỂM HƠN SV2 
 
 -- 3. Nhập vào 1 mã sinh viên và 1 mã môn học, nếu điểm trung bình môn học đó của sinh viên lớn hơn hoặc bằng 5 thì in ra "Đậu", ngược lại in ra "Không đậu"
 CREATE PROC kiemtra_dau_rot(@MSSV CHAR(8), @MSMH CHAR(5))
@@ -253,11 +280,15 @@ BEGIN
 		ELSE
 			PRINT (N'KHÔNG ĐẬU')
 END
-DECLARE @MSSV CHAR(8), @MSMH CHAR(5)
-EXEC kiemtra_dau_rot @MSSV = '21520001', @MSMH = 'IT007'
 
-INSERT INTO SV_MH VALUES ('21520001', 'IT004', '27/02/2023','17/06/2023',4);
-EXEC kiemtra_dau_rot @MSSV = '21520001', @MSMH = 'IT004'
+-- 3.1 THỰC THI 
+DECLARE @MSSV CHAR(8), @MSMH CHAR(5)
+EXEC kiemtra_dau_rot @MSSV = '21520001', @MSMH = 'IT007' -- ĐẬU 
+
+INSERT INTO SV_MH VALUES ('21520001', 'IT004', '27/02/2023','17/06/2023',4)
+EXEC kiemtra_dau_rot @MSSV = '21520001', @MSMH = 'IT004' -- KHÔNG ĐẬU 
+
+-- 3.2 KHÔI PHỤC DỮ LIỆU 
 DELETE FROM SV_MH WHERE MSSV = '21520001' AND MSMH = 'IT004'
 
 -- CRYSTAL REPORT 
