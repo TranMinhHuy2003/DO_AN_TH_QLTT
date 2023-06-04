@@ -140,6 +140,140 @@ INSERT INTO GV_MH VALUES ('GV08','IE103');
 INSERT INTO GV_MH VALUES ('GV09','IT005');
 INSERT INTO GV_MH VALUES ('GV10','IT004');
 
+-- TRIGGER 
+-- 1. TGBD phải nhỏ hơn TGKT 
+CREATE TRIGGER TGBD_TGKT
+ON SV_MH
+FOR INSERT, UPDATE
+AS
+BEGIN
+	IF ((SELECT TGBD FROM inserted) >= (SELECT TGKT FROM inserted))
+		BEGIN
+			RAISERROR(N'Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc môn học', 16, 1)
+            ROLLBACK TRANSACTION
+        END
+END
+
+-- 2. DTB không được nhỏ hơn 0 hoặc lớn hơn 10
+CREATE TRIGGER CHECK_DTB
+ON SV_MH
+FOR INSERT, UPDATE
+AS
+BEGIN
+	IF ((SELECT DTB FROM inserted) < 0 OR (SELECT DTB FROM inserted) > 10)
+		BEGIN
+			RAISERROR(N'Điểm trung bình môn học không được nhỏ hơn 0 hoặc lớn hơn 10', 16, 1)
+            ROLLBACK TRANSACTION
+        END
+END
+
+-- 3. GIAOVIEN chỉ được dạy những môn do KHOA mà GIAOVIEN đó thuộc về quản lý 
+CREATE TRIGGER GV_KHOA
+ON GIAOVIEN
+FOR UPDATE
+AS
+BEGIN
+	DECLARE @MSGV CHAR(4), @MAKHOA CHAR(4), @MSMH CHAR(5)
+	SELECT @MSGV = MSGV, @MAKHOA = KHOA FROM inserted
+
+	SELECT @MSMH = MSMH FROM GV_MH WHERE MSGV = @MSGV
+
+	IF (@MAKHOA != (SELECT KHOA FROM MONHOC WHERE MSMH = @MSMH))
+		BEGIN
+			RAISERROR(N'Giáo viên chỉ được dạy những môn do khoa mà giáo viên đó thuộc về quản lý', 16, 1)
+            ROLLBACK TRANSACTION
+        END
+END
+
+CREATE TRIGGER MONHOC_KHOA
+ON MONHOC
+FOR UPDATE
+AS
+BEGIN
+	DECLARE @MSGV CHAR(4), @MAKHOA CHAR(4), @MSMH CHAR(5)
+	SELECT @MSMH = MSMH, @MAKHOA = KHOA FROM inserted
+
+	SELECT @MSGV = MSGV FROM GV_MH WHERE MSMH = @MSMH
+
+	IF (@MAKHOA != (SELECT KHOA FROM GIAOVIEN WHERE MSGV = @MSGV))
+		BEGIN
+			RAISERROR(N'Giáo viên chỉ được dạy những môn do khoa mà giáo viên đó thuộc về quản lý', 16, 1)
+            ROLLBACK TRANSACTION
+        END
+END
+
+CREATE TRIGGER GV_MONHOC_KHOA
+ON GV_MH
+FOR INSERT
+AS
+BEGIN
+	DECLARE @MSGV CHAR(4), @MSMH CHAR(5)
+	SELECT @MSGV = MSGV, @MSMH = MSMH FROM inserted
+	IF ((SELECT KHOA FROM GIAOVIEN WHERE MSGV = @MSGV) != (SELECT KHOA FROM MONHOC WHERE MSMH = @MSMH))
+		BEGIN
+			RAISERROR(N'Giáo viên chỉ được dạy những môn do khoa mà giáo viên đó thuộc về quản lý', 16, 1)
+            ROLLBACK TRANSACTION
+        END
+END
+
+-- STORED PROCEDURE
+-- 1. In danh sách các sinh viên của 1 khoa
+CREATE PROC in_dssv(@KHOA CHAR(4))
+AS
+BEGIN
+	SELECT *
+	FROM SINHVIEN
+	WHERE KHOA = @KHOA
+END
+
+DECLARE @KHOA CHAR(4)
+EXEC in_dssv @KHOA = 'KH02'
+-- 2. Nhập vào 2 sinh viên, 1 môn học, tìm xem sinh viên nào có điểm trung bình cao hơn và in ra thông tin, nếu bằng nhau thì in ra thông báo 
+CREATE PROC sosanh_diem(@MSSV1 CHAR(8),@MSSV2 CHAR(8),@MSMH CHAR(5))
+AS
+BEGIN
+		IF((SELECT DTB FROM SV_MH WHERE MSSV = @MSSV1 AND MSMH = @MSMH) > (SELECT DTB FROM SV_MH WHERE MSSV = @MSSV2 AND MSMH = @MSMH))
+			SELECT * FROM SINHVIEN WHERE MSSV = @MSSV1 
+		ELSE IF ((SELECT DTB FROM SV_MH WHERE MSSV = @MSSV1 AND MSMH = @MSMH) < (SELECT DTB FROM SV_MH WHERE MSSV = @MSSV2 AND MSMH = @MSMH))
+			SELECT * FROM SINHVIEN WHERE MSSV = @MSSV2 
+		ELSE
+			PRINT (N'2 sinh viên trên có điểm trung bình bằng nhau')
+END
+DROP PROC sosanh_diem
+DECLARE @MSSV1 CHAR(8), @MSSV2 CHAR(8), @MSMH CHAR(5)
+EXEC sosanh_diem @MSSV1 = '21520001', @MSSV2 = '21520002', @MSMH = 'IE103'
+EXEC sosanh_diem @MSSV1 = '21520001', @MSSV2 = '21520002', @MSMH = 'IT007'
+
+-- 3. Nhập vào 1 mã sinh viên và 1 mã môn học, nếu điểm trung bình môn học đó của sinh viên lớn hơn hoặc bằng 5 thì in ra "Đậu", ngược lại in ra "Không đậu"
+CREATE PROC kiemtra_dau_rot(@MSSV CHAR(8), @MSMH CHAR(5))
+AS
+BEGIN
+		IF((SELECT DTB FROM SV_MH WHERE MSSV = @MSSV AND MSMH = @MSMH) >= 5)
+			PRINT (N'ĐẬU') 
+		ELSE
+			PRINT (N'KHÔNG ĐẬU')
+END
+DECLARE @MSSV CHAR(8), @MSMH CHAR(5)
+EXEC kiemtra_dau_rot @MSSV = '21520001', @MSMH = 'IT007'
+
+INSERT INTO SV_MH VALUES ('21520001', 'IT004', '27/02/2023','17/06/2023',4);
+EXEC kiemtra_dau_rot @MSSV = '21520001', @MSMH = 'IT004'
+DELETE FROM SV_MH WHERE MSSV = '21520001' AND MSMH = 'IT004'
+
+-- CRYSTAL REPORT 
+-- 1. Tạo report in bảng điểm môn học cho môn Hệ điều hành - IT007
+CREATE VIEW BANGDIEM_IT007
+AS
+	SELECT SINHVIEN.MSSV, TENSV, SODT, DIACHI, TENK, DTB
+	FROM SINHVIEN, KHOA, SV_MH
+	WHERE SINHVIEN.KHOA = KHOA.MSK AND SINHVIEN.MSSV = SV_MH.MSSV AND MSMH = 'IT007'
+-- 2. Tạo report thống kê điểm trung bình sinh viên theo từng môn học 
+CREATE VIEW THONGKE_DIEM
+AS
+	SELECT MONHOC.MSMH, TENMH, SINHVIEN.MSSV, TENSV, DTB
+	FROM SINHVIEN, MONHOC, SV_MH
+	WHERE SINHVIEN.MSSV = SV_MH.MSSV AND MONHOC.MSMH = SV_MH.MSMH
+
 -- BACKUP
 BACKUP DATABASE QLSV TO DISK = 'C:\DoAn\QLSV_DB_BACKUP.BAK'
 
@@ -161,6 +295,7 @@ CHECK_EXPIRATION = OFF,
 DEFAULT_DATABASE = QLSV;
 GO
 --TAO USER
+USE QLSV 
 CREATE USER GV_NHAPDIEM FOR LOGIN NHAPDIEM
 GO
 -- CAP QUYEN 
@@ -179,6 +314,7 @@ CHECK_EXPIRATION = OFF,
 DEFAULT_DATABASE = QLSV;
 GO
 --TAO USER
+USE QLSV
 CREATE USER SV_XEMDIEM FOR LOGIN XEMDIEM
 GO
 -- CAP QUYEN 
