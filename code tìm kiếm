@@ -1,0 +1,30 @@
+--2. Dựa vào từ khóa hiển thị:
+--		Thông tin các tài liệu có từ khóa đó:  mã tài liệu, tên tài liệu, tên tác giả, tên nhà xuất bản, ngày xuất bản
+
+CREATE PROC PROC_TaiLieu_BY_TuKhoa
+	@TuKhoa NVARCHAR(100)
+AS
+BEGIN
+	-- LOGIC
+	IF EXISTS (SELECT * FROM TAILIEU WHERE TAILIEU.TenTaiLieu LIKE '%' + @TuKhoa + '%')
+		BEGIN
+			SELECT tl.MaTaiLieu as 'Mã tài liệu', tl.TenTaiLieu as 'Tên tài liệu',
+			TACGIA.TenTacGia as 'Tên tác giả', nxb.TenNXB as 'Tên nhà xuất bản', tl.NgayXuatBan as 'Ngày xuất bản'
+			FROM THELOAI JOIN TAILIEU tl ON THELOAI.MaTheLoai = tl.MaTheLoai
+			JOIN NHAXUATBAN nxb ON nxb.MaNXB = tl.MaNXB JOIN TAILIEU_TACGIA ON TAILIEU_TACGIA.MaTaiLieu = tl.MaTaiLieu
+			JOIN TACGIA ON TAILIEU_TACGIA.MaTacGia = TACGIA.MaTacGia
+			WHERE tl.TenTaiLieu LIKE '%' + @TuKhoa + '%'
+		END
+	ELSE
+		PRINT N'Không tìm thấy tài liệu có tên phù hợp.'
+END
+GO
+-- THUC THI VA KIEM TRA
+DECLARE @TuKhoa NVARCHAR(100)
+SET @TuKhoa = 'nhạc'
+
+EXEC PROC_TaiLieu_BY_TuKhoa @TuKhoa
+
+-- XOA
+DROP PROC PROC_TaiLieu_BY_TuKhoa
+GO
